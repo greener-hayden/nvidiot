@@ -1,0 +1,177 @@
+"""NvAPI status codes and DRS setting IDs."""
+
+from enum import IntEnum
+
+
+class NvAPI_Status(IntEnum):
+    NVAPI_OK = 0
+    NVAPI_ERROR = -1
+    NVAPI_LIBRARY_NOT_FOUND = -2
+    NVAPI_NO_IMPLEMENTATION = -3
+    NVAPI_API_NOT_INITIALIZED = -4
+    NVAPI_INVALID_ARGUMENT = -5
+    NVAPI_NVIDIA_DEVICE_NOT_FOUND = -6
+    NVAPI_END_ENUMERATION = -7
+    NVAPI_INVALID_HANDLE = -8
+    NVAPI_INCOMPATIBLE_STRUCT_VERSION = -9
+    NVAPI_HANDLE_INVALIDATED = -10
+    NVAPI_OPENGL_CONTEXT_NOT_CURRENT = -11
+    NVAPI_INVALID_POINTER = -14
+    NVAPI_NO_GL_EXPERT = -12
+    NVAPI_INSTRUMENT_NOT_FOUND = -13
+    NVAPI_EXPECTED_LOGICAL_GPU_HANDLE = -100
+    NVAPI_EXPECTED_PHYSICAL_GPU_HANDLE = -101
+    NVAPI_EXPECTED_DISPLAY_HANDLE = -102
+    NVAPI_INVALID_COMBINATION = -103
+    NVAPI_NOT_SUPPORTED = -104
+    NVAPI_PORTID_NOT_FOUND = -105
+    NVAPI_EXPECTED_UNATTACHED_DISPLAY_HANDLE = -106
+    NVAPI_INVALID_PERF_LEVEL = -107
+    NVAPI_DEVICE_BUSY = -108
+    NVAPI_PERSISTENCE_DISPLAY_NOT_FOUND = -109
+    NVAPI_PERSIST_DISPLAY_ID_NOT_VALID = -110
+    NVAPI_PROFILE_NOT_FOUND = -200
+    NVAPI_PROFILE_NAME_IN_USE = -201
+    NVAPI_PROFILE_NAME_EMPTY = -202
+    NVAPI_EXECUTABLE_NOT_FOUND = -203
+    NVAPI_EXECUTABLE_ALREADY_IN_USE = -204
+    NVAPI_DATATYPE_MISMATCH = -205
+    NVAPI_PROFILE_REMOVED = -206
+    NVAPI_UNREGISTERED_RESOURCE = -170
+    NVAPI_ID_OUT_OF_RANGE = -171
+    NVAPI_DISPLAYCONFIG_VALIDATION_FAILED = -172
+    NVAPI_MOSAIC_NOT_ACTIVE = -220
+    NVAPI_SHARE_RESOURCE_RELOCATED = -221
+    NVAPI_SETTING_NOT_FOUND = -210
+    NVAPI_SETTING_SIZE_TOO_LARGE = -211
+    NVAPI_TOO_MANY_SETTINGS_IN_PROFILE = -212
+    NVAPI_SETTING_TYPE_MISMATCH = -213
+    NVAPI_SETTING_ACCESS_DENIED = -214
+    NVAPI_SETTING_NOT_FOUND_NO_DEFAULT = -215
+
+
+# NvAPI QueryInterface function IDs
+NVAPI_FUNC_IDS = {
+    "NvAPI_Initialize": 0x0150E828,
+    "NvAPI_Unload": 0xD22BDD7E,
+    "NvAPI_GetErrorMessage": 0x6C2D048C,
+    "NvAPI_EnumPhysicalGPUs": 0xE5AC921F,
+    "NvAPI_GPU_GetFullName": 0xCEEE8E9F,
+    "NvAPI_GPU_GetThermalSettings": 0xE3640A56,
+    "NvAPI_GPU_GetAllClockFrequencies": 0xDCB616C3,
+    "NvAPI_DRS_CreateSession": 0x0694D52E,
+    "NvAPI_DRS_DestroySession": 0xDAD9CFF8,
+    "NvAPI_DRS_LoadSettings": 0x375DBD6B,
+    "NvAPI_DRS_SaveSettings": 0xFCBC7E14,
+    "NvAPI_DRS_GetBaseProfile": 0xDA8466A0,
+    "NvAPI_DRS_EnumProfiles": 0x7AE3B070,
+    "NvAPI_DRS_FindProfileByName": 0x7E4A9A0B,
+    "NvAPI_DRS_CreateProfile": 0xCC176068,
+    "NvAPI_DRS_DeleteProfile": 0x17093206,
+    "NvAPI_DRS_GetProfileInfo": 0x61CD6FD6,
+    "NvAPI_DRS_GetSetting": 0x73BF8338,
+    "NvAPI_DRS_SetSetting": 0x577DD202,
+    "NvAPI_DRS_DeleteProfileSetting": 0xE4A26362,
+    "NvAPI_DRS_EnumSettings": 0xAE3039DA,
+    "NvAPI_DRS_EnumApplications": 0x7FA2173A,
+    "NvAPI_DRS_CreateApplication": 0x4347A9DE,
+    "NvAPI_DRS_DeleteApplicationEx": 0xC5EC76A1,
+    "NvAPI_DRS_GetNumProfiles": 0x1DAE4FBC,
+    # Display control (saturation via NVAPI, resolution via Win32)
+    "NvAPI_EnumNvidiaDisplayHandle": 0x9ABDD40D,
+    "NvAPI_GetDVCInfo": 0x4085DE45,
+    "NvAPI_SetDVCLevel": 0x172409B4,
+}
+
+# DRS Setting type enum
+NVDRS_DWORD_TYPE = 0
+NVDRS_BINARY_TYPE = 1
+NVDRS_STRING_TYPE = 2
+NVDRS_WSTRING_TYPE = 3
+
+# Well-known DRS Setting IDs (from NvApiDriverSettings.h)
+# This is a subset; the full list has hundreds of entries.
+SETTING_IDS = {
+    # Antialiasing
+    0x10F329A0: "AA_BEHAVIOR_FLAGS",
+    0x00D55F7E: "AA_MODE_ALPHATOCOVERAGE",
+    0x003089F1: "AA_MODE_GAMMACORRECTION",
+    0x00000019: "AA_MODE_METHOD",
+    0x0000001A: "AA_MODE_REPLAY",
+    0x0000001C: "AA_MODE_SELECTOR",
+    0x107F5E09: "AA_FIX_ID",
+    # Anisotropic filtering
+    0x0000101E: "ANISO_MODE_LEVEL",
+    0x0000101F: "ANISO_MODE_SELECTOR",
+    0x00001014: "TEXTURE_FILTERING_QUALITY",
+    0x00001015: "TEXTURE_FILTERING_NEGLODBIAS",
+    # VSync
+    0x00000018: "VSYNC_MODE",
+    0x00000013: "VSYNC_ADAPTIVE",
+    0x00000017: "VSYNC_TEARCONTROL",
+    0x0A4CF372: "FRAME_RATE_LIMITER_V3",
+    # Threading / SLI
+    0x20C1221E: "OGL_THREAD_CONTROL",
+    0x0000001D: "SLI_GPU_COUNT",
+    0x0000001E: "SLI_PREDEFINED_GPU_COUNT",
+    0x0000001F: "SLI_PREDEFINED_MODE",
+    0x00000020: "SLI_PREDEFINED_GPU_COUNT_DX10",
+    0x00000021: "SLI_PREDEFINED_MODE_DX10",
+    0x00000022: "SLI_RENDERING_MODE",
+    # Power management
+    0x0000002F: "PREFERRED_PSTATE",
+    # Shader cache
+    0x00B21B89: "PS_SHADERDISKCACHE",
+    0x0064B541: "PS_SHADERDISKCACHE_MAX_SIZE",
+    # Triple buffering (OGL_FORCE_BLIT controls triple buffering)
+    0x00000014: "OGL_FORCE_BLIT",
+    # Ambient occlusion
+    0x00667329: "AO_MODE",
+    0x001863E4: "AO_MODE_ACTIVE",
+    # CUDA
+    0x00000001: "CUDA_EXCLUDED_GPUS",
+    # Low latency
+    0x00000024: "LOW_LATENCY_MODE",
+    # Image sharpening
+    0x00E73211: "IMAGE_SHARPENING_DEFAULT",
+    0x00E73210: "IMAGE_SHARPENING_ENABLE",
+    # Resizable BAR
+    0x000F00BA: "RBAR_FEATURE",
+    0x000F00BB: "RBAR_OPTIONS",
+    0x000F00BC: "RBAR_SIZE_LIMIT",
+}
+
+
+
+# Known setting value enums
+# Note: VSyncMode values are driver-version-dependent small integers.
+# Query via the API to discover actual values for your driver version.
+class VSyncMode(IntEnum):
+    OFF = 0
+    ON = 1
+    ADAPTIVE = 2
+
+
+class TextureFilteringQuality(IntEnum):
+    HIGH_QUALITY = 0
+    QUALITY = 1
+    PERFORMANCE = 2
+    HIGH_PERFORMANCE = 3
+
+
+class PreferredPState(IntEnum):
+    ADAPTIVE = 0x00000000
+    PREFER_MAX = 0x00000001
+    DRIVER_CONTROLLED = 0x00000002
+    PREFER_CONSISTENT = 0x00000003
+
+
+# Reverse lookup: setting name → setting ID.
+SETTING_NAMES_TO_IDS: dict[str, int] = {v: k for k, v in SETTING_IDS.items()}
+
+# Maps setting IDs to their valid value enums (for write validation).
+SETTING_VALUE_RANGES: dict[int, type[IntEnum]] = {
+    0x00000018: VSyncMode,              # VSYNC_MODE
+    0x00001014: TextureFilteringQuality, # TEXTURE_FILTERING_QUALITY
+    0x0000002F: PreferredPState,        # PREFERRED_PSTATE
+}
