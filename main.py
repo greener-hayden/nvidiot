@@ -6,17 +6,13 @@
 #   $token = Get-Content "$env:USERPROFILE\.nvidiot-token"
 #   curl -H "Authorization: Bearer $token" -X POST http://127.0.0.1:8000/shutdown
 
-"""Uvicorn entrypoint for the nvidiot API."""
+"""Stdlib HTTP server entrypoint for the nvidiot API."""
 
 import os
 import secrets
 from pathlib import Path
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-
-from api.auth import init_token
-from api.routes import read_router, write_router
+from api.server import NvidiotServer, Handler, init_token
 
 # --- Token setup ---
 TOKEN = os.environ.get("NVIDIOT_TOKEN") or secrets.token_urlsafe(32)
@@ -24,36 +20,19 @@ TOKEN_PATH = Path.home() / ".nvidiot-token"
 
 init_token(TOKEN)
 
-app = FastAPI(
-    title="nvidiot",
-    description="REST API wrapping NVIDIA Control Panel settings via NVAPI",
-    version="0.1.0",
-    docs_url=None,
-    redoc_url=None,
-    openapi_url=None,
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://127.0.0.1:6124"],
-    allow_methods=["GET", "PUT", "POST", "DELETE"],
-    allow_headers=["Authorization"],
-)
-
-app.include_router(read_router)
-app.include_router(write_router)
-
 HOST = "127.0.0.1"
 PORT = 8000
 
 
 def _write_token_file() -> None:
     """Write the auth token to ~/.nvidiot-token with restrictive permissions."""
-    fd = os.open(str(TOKEN_PATH), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    try:
-        os.write(fd, TOKEN.encode())
-    finally:
-        os.close(fd)
+    TOKEN_PATH.write_text(TOKEN)
+    import subprocess
+    subprocess.run(
+        ["icacls", str(TOKEN_PATH), "/inheritance:r",
+         "/grant:r", f"{os.getlogin()}:(F)"],
+        capture_output=True,
+    )
     print(f"Auth token written to {TOKEN_PATH}")
 
 
@@ -137,8 +116,11 @@ def _replace_existing_instance() -> None:
 
 
 if __name__ == "__main__":
-    import uvicorn
-
     _replace_existing_instance()
     _write_token_file()
-    uvicorn.run(app, host=HOST, port=PORT)
+    print(f"Listening on http://{HOST}:{PORT}")
+    server = NvidiotServer((HOST, PORT), Handler)
+    try:
+        server.serve_until_stopped()
+    except KeyboardInterrupt:
+        server.server_close()

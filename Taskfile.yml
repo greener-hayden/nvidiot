@@ -1,0 +1,55 @@
+version: "3"
+
+vars:
+  VENV_DIR: .venv
+  PYTHON: "{{.VENV_DIR}}/Scripts/python"
+  PIP: "{{.VENV_DIR}}/Scripts/pip"
+  INSTALL_DIR:
+    sh: echo "${LOCALAPPDATA}/nvidiot"
+  BIN_DIR:
+    sh: echo "${USERPROFILE}/.local/bin"
+
+tasks:
+  venv:
+    desc: Create venv and install dependencies if needed
+    internal: true
+    cmds:
+      - python -m venv {{.VENV_DIR}}
+      - "{{.PYTHON}} -m pip install --upgrade pip setuptools"
+      - "{{.PIP}} install -e .[dev]"
+    status:
+      - test -d {{.VENV_DIR}}
+      - "{{.PIP}} show fastapi"
+
+  dev:
+    desc: Run the API server with auto-reload
+    deps: [venv]
+    cmds:
+      - "{{.PYTHON}} main.py"
+
+  build:
+    desc: Build standalone .exe with PyInstaller
+    deps: [venv]
+    cmds:
+      - "{{.PIP}} install pyinstaller"
+      - "{{.VENV_DIR}}/Scripts/pyinstaller --onefile --name nvidiot main.py"
+
+  stop:
+    desc: Stop running nvidiot instance
+    ignore_error: true
+    cmds:
+      - 'powershell -NoProfile -Command "if (Test-Path \"$env:USERPROFILE\.nvidiot-token\") { $t = Get-Content \"$env:USERPROFILE\.nvidiot-token\"; curl.exe -s -o NUL -X POST -H \"Authorization: Bearer $t\" http://127.0.0.1:8000/shutdown } else { curl.exe -s -o NUL -X POST http://127.0.0.1:8000/shutdown }"'
+      - 'taskkill /F /IM nvidiot.exe 2>NUL || true'
+      - 'powershell -NoProfile -Command "Start-Sleep -Seconds 2"'
+
+  install:
+    desc: Build and install nvidiot to the standard location
+    deps: [build]
+    cmds:
+      - task: stop
+      - mkdir -p "{{.INSTALL_DIR}}"
+      - cp dist/nvidiot.exe "{{.INSTALL_DIR}}/nvidiot.exe"
+      - mkdir -p "{{.BIN_DIR}}"
+      - cp nvidiot.cmd "{{.BIN_DIR}}/nvidiot.cmd"
+      - echo "Installed nvidiot to {{.INSTALL_DIR}}/nvidiot.exe"
+      - echo "Wrapper copied to {{.BIN_DIR}}/nvidiot.cmd"
