@@ -50,11 +50,12 @@ curl -H "Authorization: Bearer $token" -X POST http://127.0.0.1:8000/shutdown
 
 1. **`nvapi/ffi.py`** — ctypes bindings to `nvapi64.dll` via `nvapi_QueryInterface`
 2. **`nvapi/service.py`** — business logic returning plain dicts
-3. **`api/routes.py`** — thin FastAPI route handlers
+3. **`api/server.py`** — stdlib HTTP server and JSON route handlers
 
 ## Testing
 
-Requires a real NVIDIA GPU — no mocks.
+- **`tests/test_unit.py`** — validation and helpers with mocked DLL (no GPU)
+- **`tests/test_api.py`** and other integration tests — real NVIDIA hardware
 
 ```bash
 pytest

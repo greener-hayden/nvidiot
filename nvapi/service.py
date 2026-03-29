@@ -1,4 +1,4 @@
-"""Pythonic wrappers around NVAPI FFI, returning Pydantic models."""
+"""Pythonic wrappers around NVAPI FFI, returning plain dicts."""
 
 from contextlib import contextmanager
 from typing import Generator
@@ -338,5 +338,7 @@ def apply_gaming_preset(
 def apply_desktop_preset(saturation: int = 50) -> dict:
     _ensure_initialized()
     native = ffi.GetNativeDisplayMode()
-    ffi.SetDisplayMode(native["width"], native["height"], native["refresh"])
+    ffi.SetDisplayMode(
+        native["width"], native["height"], native["refresh"], stretch=False
+    )
     return set_saturation(saturation)

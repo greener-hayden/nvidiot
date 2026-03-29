@@ -189,8 +189,6 @@ class Handler(BaseHTTPRequestHandler):
         _last_write = now
         return True
 
-    _FAILED = object()
-
     def _nvapi(self, func, *args, **kwargs):
         """Call a service function, mapping NvAPIError to HTTP status."""
         try:
