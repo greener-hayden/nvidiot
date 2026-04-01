@@ -9,3 +9,4 @@ venv/
 *.so
 *.dll
 .pytest_cache/
+*.spec

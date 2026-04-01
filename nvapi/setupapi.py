@@ -2,6 +2,7 @@
 
 import ctypes
 import ctypes.wintypes as wt
+import subprocess
 from ctypes import (
     POINTER,
     Structure,
@@ -23,7 +24,7 @@ _user32 = WinDLL("user32")
 
 
 # ------------------------------------------------------------------
-# GUID structure
+# GUID / constants / structures
 # ------------------------------------------------------------------
 class GUID(Structure):
     _fields_ = [
@@ -40,23 +41,13 @@ GUID_DEVCLASS_MONITOR = GUID(
     (c_ubyte * 8)(0xBF, 0xC1, 0x08, 0x00, 0x2B, 0xE1, 0x03, 0x18),
 )
 
-
-# ------------------------------------------------------------------
-# Constants
-# ------------------------------------------------------------------
 DIGCF_PRESENT = 0x00000002
 DIF_PROPERTYCHANGE = 0x00000012
-DICS_ENABLE = 0x00000001
 DICS_DISABLE = 0x00000002
 DICS_FLAG_GLOBAL = 0x00000001
-
-DISPLAY_DEVICE_ACTIVE = 0x00000001
 DISPLAY_DEVICE_PRIMARY_DEVICE = 0x00000004
 
 
-# ------------------------------------------------------------------
-# SetupAPI structures
-# ------------------------------------------------------------------
 class SP_DEVINFO_DATA(Structure):
     _fields_ = [
         ("cbSize", wt.DWORD),
@@ -82,9 +73,6 @@ class SP_PROPCHANGE_PARAMS(Structure):
     ]
 
 
-# ------------------------------------------------------------------
-# DISPLAY_DEVICEW for EnumDisplayDevices
-# ------------------------------------------------------------------
 class DISPLAY_DEVICEW(Structure):
     _fields_ = [
         ("cb", wt.DWORD),
@@ -143,13 +131,18 @@ class SetupAPIError(Exception):
     pass
 
 
-def get_primary_monitor_pnpid() -> str:
-    """Return the PnP device ID of the primary monitor.
+# Cached so lookups survive the monitor being disabled (a disabled
+# monitor disappears from EnumDisplayDevices).
+_cached_primary_pnpid: str | None = None
+_cached_instance_id: str | None = None
 
-    Walks EnumDisplayDevices to find the primary adapter, then its
-    child monitor, and returns the DeviceID (PnP hardware path).
-    """
-    # Find primary adapter
+
+def get_primary_monitor_pnpid() -> str:
+    """Return the PnP device ID of the primary monitor (cached)."""
+    global _cached_primary_pnpid
+    if _cached_primary_pnpid is not None:
+        return _cached_primary_pnpid
+
     adapter = DISPLAY_DEVICEW()
     adapter.cb = sizeof(DISPLAY_DEVICEW)
     idx = 0
@@ -163,7 +156,6 @@ def get_primary_monitor_pnpid() -> str:
     if primary_adapter_name is None:
         raise SetupAPIError("no primary display adapter found")
 
-    # Find the monitor attached to the primary adapter
     monitor = DISPLAY_DEVICEW()
     monitor.cb = sizeof(DISPLAY_DEVICEW)
     if not _EnumDisplayDevicesW(primary_adapter_name, 0, byref(monitor), 0):
@@ -173,26 +165,27 @@ def get_primary_monitor_pnpid() -> str:
     if not device_id:
         raise SetupAPIError("primary monitor has no DeviceID")
 
+    _cached_primary_pnpid = device_id
     return device_id
 
 
-def _set_monitor_state(pnp_id: str, enable: bool) -> None:
-    """Enable or disable a monitor device in Device Manager by PnP ID."""
-    # Extract the hardware ID portion for matching.
-    # EnumDisplayDevices returns e.g. "MONITOR\\MSI3EA5\\{guid}\\0008"
-    # SetupAPI instance IDs look like  "DISPLAY\\MSI3EA5\\5&xxx&1&UIDnnn"
-    # We match on the model ID (second segment) since the first segment differs.
-    parts = pnp_id.replace("\\\\", "\\").split("\\")
-    if len(parts) >= 2:
-        model_id = parts[1].upper()
-    else:
-        model_id = pnp_id.upper()
+def _extract_model_id(pnp_id: str) -> str:
+    """Extract model ID segment from an EnumDisplayDevices PnP path.
 
-    # Use DIGCF_PRESENT when disabling (targets the active instance),
-    # but enumerate all devices when enabling (disabled devices aren't "present").
-    flags = DIGCF_PRESENT if not enable else 0
+    E.g. "MONITOR\\MSI3EA5\\{guid}\\0008" → "MSI3EA5"
+    """
+    parts = pnp_id.replace("\\\\", "\\").split("\\")
+    return parts[1].upper() if len(parts) >= 2 else pnp_id.upper()
+
+
+def _enum_monitor_devices():
+    """Yield (dev_info_handle, SP_DEVINFO_DATA, instance_id) for present monitors.
+
+    Caller must NOT destroy the handle — it's destroyed when the generator
+    is closed or exhausted.
+    """
     dev_info = _SetupDiGetClassDevsW(
-        byref(GUID_DEVCLASS_MONITOR), None, None, flags,
+        byref(GUID_DEVCLASS_MONITOR), None, None, DIGCF_PRESENT,
     )
     if dev_info == INVALID_HANDLE_VALUE:
         raise SetupAPIError("SetupDiGetClassDevs failed")
@@ -206,7 +199,6 @@ def _set_monitor_state(pnp_id: str, enable: bool) -> None:
                 break
             idx += 1
 
-            # Get the device instance ID
             buf = ctypes.create_unicode_buffer(512)
             needed = wt.DWORD(0)
             if not _SetupDiGetDeviceInstanceIdW(
@@ -214,53 +206,80 @@ def _set_monitor_state(pnp_id: str, enable: bool) -> None:
             ):
                 continue
 
-            # Instance IDs look like "DISPLAY\MSI3EA5\5&xxx&1&UIDnnn"
-            # Match on the model ID segment (e.g. "MSI3EA5")
-            instance_id = buf.value.upper()
-            id_parts = instance_id.split("\\")
-            if len(id_parts) >= 2 and id_parts[1] == model_id:
-                pass  # match — fall through to state change
-            else:
-                continue
-
-            # Found the matching monitor — change its state
-            params = SP_PROPCHANGE_PARAMS()
-            params.ClassInstallHeader.cbSize = sizeof(SP_CLASSINSTALL_HEADER)
-            params.ClassInstallHeader.InstallFunction = DIF_PROPERTYCHANGE
-            params.StateChange = DICS_ENABLE if enable else DICS_DISABLE
-            params.Scope = DICS_FLAG_GLOBAL
-            params.HwProfile = 0
-
-            if not _SetupDiSetClassInstallParamsW(
-                dev_info,
-                byref(dev_data),
-                byref(params.ClassInstallHeader),
-                sizeof(params),
-            ):
-                raise SetupAPIError("SetupDiSetClassInstallParams failed")
-
-            if not _SetupDiCallClassInstaller(
-                DIF_PROPERTYCHANGE, dev_info, byref(dev_data),
-            ):
-                action = "enable" if enable else "disable"
-                raise SetupAPIError(
-                    f"SetupDiCallClassInstaller failed to {action} monitor "
-                    f"(requires admin privileges)"
-                )
-            return
-
-        raise SetupAPIError(
-            f"no monitor device matching model '{model_id}' found in Device Manager"
-        )
+            yield dev_info, dev_data, buf.value
     finally:
         _SetupDiDestroyDeviceInfoList(dev_info)
 
 
 def disable_monitor_device(pnp_id: str) -> None:
     """Disable a monitor device in Device Manager (requires admin)."""
-    _set_monitor_state(pnp_id, enable=False)
+    global _cached_instance_id
+    model_id = _extract_model_id(pnp_id)
+
+    for dev_info, dev_data, instance_id in _enum_monitor_devices():
+        id_parts = instance_id.upper().split("\\")
+        if len(id_parts) < 2 or id_parts[1] != model_id:
+            continue
+
+        params = SP_PROPCHANGE_PARAMS()
+        params.ClassInstallHeader.cbSize = sizeof(SP_CLASSINSTALL_HEADER)
+        params.ClassInstallHeader.InstallFunction = DIF_PROPERTYCHANGE
+        params.StateChange = DICS_DISABLE
+        params.Scope = DICS_FLAG_GLOBAL
+        params.HwProfile = 0
+
+        if not _SetupDiSetClassInstallParamsW(
+            dev_info,
+            byref(dev_data),
+            byref(params.ClassInstallHeader),
+            sizeof(params),
+        ):
+            raise SetupAPIError("SetupDiSetClassInstallParams failed")
+
+        if not _SetupDiCallClassInstaller(
+            DIF_PROPERTYCHANGE, dev_info, byref(dev_data),
+        ):
+            err = ctypes.get_last_error() or ctypes.GetLastError()
+            raise SetupAPIError(
+                f"SetupDiCallClassInstaller failed to disable monitor "
+                f"(error {err}, requires admin privileges)"
+            )
+        _cached_instance_id = instance_id
+        return
+
+    raise SetupAPIError(
+        f"no monitor device matching model '{model_id}' found in Device Manager"
+    )
 
 
 def enable_monitor_device(pnp_id: str) -> None:
-    """Enable a monitor device in Device Manager (requires admin)."""
-    _set_monitor_state(pnp_id, enable=True)
+    """Enable a monitor device in Device Manager (requires admin).
+
+    Uses pnputil because SetupAPI DICS_ENABLE does not reliably
+    re-enable devices even with admin privileges.
+    """
+    global _cached_instance_id
+    instance_id = _cached_instance_id
+    if instance_id is None:
+        instance_id = _find_instance_id(pnp_id)
+    result = subprocess.run(
+        ["pnputil", "/enable-device", instance_id],
+        capture_output=True, text=True, timeout=10,
+    )
+    if result.returncode != 0:
+        raise SetupAPIError(
+            f"pnputil /enable-device failed: {result.stderr.strip() or result.stdout.strip()}"
+        )
+    _cached_instance_id = None
+
+
+def _find_instance_id(pnp_id: str) -> str:
+    """Resolve an EnumDisplayDevices PnP ID to a SetupAPI instance ID."""
+    model_id = _extract_model_id(pnp_id)
+    for _, _, instance_id in _enum_monitor_devices():
+        id_parts = instance_id.upper().split("\\")
+        if len(id_parts) >= 2 and id_parts[1] == model_id:
+            return instance_id
+    raise SetupAPIError(
+        f"no monitor device matching model '{model_id}' found in Device Manager"
+    )

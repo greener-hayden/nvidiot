@@ -8,6 +8,7 @@ vars:
     sh: echo "${LOCALAPPDATA}/nvidiot"
   BIN_DIR:
     sh: echo "${USERPROFILE}/.local/bin"
+  TASK_NAME: nvidiot
 
 tasks:
   venv:
@@ -32,7 +33,7 @@ tasks:
     deps: [venv]
     cmds:
       - "{{.PIP}} install pyinstaller"
-      - "{{.VENV_DIR}}/Scripts/pyinstaller --onefile --name nvidiot main.py"
+      - "{{.VENV_DIR}}/Scripts/pyinstaller --onefile --noconsole --name nvidiot main.py"
 
   stop:
     desc: Stop running nvidiot instance
@@ -43,7 +44,7 @@ tasks:
       - 'powershell -NoProfile -Command "Start-Sleep -Seconds 2"'
 
   install:
-    desc: Build and install nvidiot to the standard location
+    desc: Build, install, and register as a scheduled task (requires admin)
     deps: [build]
     cmds:
       - task: stop
@@ -51,5 +52,18 @@ tasks:
       - cp dist/nvidiot.exe "{{.INSTALL_DIR}}/nvidiot.exe"
       - mkdir -p "{{.BIN_DIR}}"
       - cp nvidiot.cmd "{{.BIN_DIR}}/nvidiot.cmd"
+      - task: register
       - echo "Installed nvidiot to {{.INSTALL_DIR}}/nvidiot.exe"
-      - echo "Wrapper copied to {{.BIN_DIR}}/nvidiot.cmd"
+      - echo "Scheduled task '{{.TASK_NAME}}' registered (runs at logon with admin privileges)"
+
+  register:
+    desc: Create/update the scheduled task to run nvidiot at logon with admin privileges
+    cmds:
+      - 'powershell -NoProfile -Command "Start-Process powershell -Verb RunAs -Wait -ArgumentList ''-NoProfile'', ''-Command'', ''schtasks /Delete /TN \"{{.TASK_NAME}}\" /F 2>$null; schtasks /Create /TN \"{{.TASK_NAME}}\" /TR \"\\\"{{.INSTALL_DIR}}/nvidiot.exe\\\"\" /SC ONLOGON /RL HIGHEST /F; schtasks /Run /TN \"{{.TASK_NAME}}\"''"'
+
+  uninstall:
+    desc: Stop nvidiot and remove the scheduled task
+    cmds:
+      - task: stop
+      - 'schtasks /Delete /TN "{{.TASK_NAME}}" /F 2>NUL || true'
+      - echo "Scheduled task '{{.TASK_NAME}}' removed"
