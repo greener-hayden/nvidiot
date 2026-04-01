@@ -91,6 +91,7 @@ def validate_gaming_preset(data: dict) -> dict:
         "stretch": stretch,
         "disable_monitor": _opt_bool(data, "disable_monitor"),
         "stop_glazewm": _opt_bool(data, "stop_glazewm"),
+        "disable_borders": _opt_bool(data, "disable_borders"),
         "fix_refresh": _opt_bool(data, "fix_refresh"),
         "skip_devices": _opt_str_list(data, "skip_devices"),
     }
@@ -101,6 +102,7 @@ def validate_desktop_preset(data: dict) -> dict:
         "saturation": _int_range(data, "saturation", 0, 100, default=50),
         "enable_monitor": _opt_bool(data, "enable_monitor"),
         "start_glazewm": _opt_bool(data, "start_glazewm"),
+        "enable_borders": _opt_bool(data, "enable_borders"),
         "fix_refresh": _opt_bool(data, "fix_refresh"),
         "skip_devices": _opt_str_list(data, "skip_devices"),
     }

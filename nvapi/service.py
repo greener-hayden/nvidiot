@@ -1,7 +1,10 @@
 """Pythonic wrappers around NVAPI FFI, returning plain dicts."""
 
 import logging
+import os
+import shutil
 import subprocess
+import urllib.request
 from contextlib import contextmanager
 from typing import Generator
 
@@ -367,12 +370,15 @@ def apply_gaming_preset(
     stretch: bool = True,
     disable_monitor: bool = False,
     stop_glazewm: bool = False,
+    disable_borders: bool = False,
     fix_refresh: bool = False,
     skip_devices: list[str] | None = None,
 ) -> dict:
     _ensure_initialized()
     if stop_glazewm:
         _stop_glazewm()
+    if disable_borders:
+        _mover_borders(enable=False)
     if disable_monitor:
         try:
             from . import setupapi
@@ -391,6 +397,7 @@ def apply_desktop_preset(
     saturation: int = 50,
     enable_monitor: bool = False,
     start_glazewm: bool = False,
+    enable_borders: bool = False,
     fix_refresh: bool = False,
     skip_devices: list[str] | None = None,
 ) -> dict:
@@ -409,9 +416,46 @@ def apply_desktop_preset(
     result = set_saturation(saturation)
     if fix_refresh:
         result["refresh_fixes"] = fix_refresh_rates(skip_devices)
+    if enable_borders:
+        _mover_borders(enable=True)
     if start_glazewm:
         _start_glazewm()
     return result
+
+
+# ------------------------------------------------------------------
+# Mover borders control
+# ------------------------------------------------------------------
+_MOVER_BASE = "http://127.0.0.1:42123"
+
+
+def _mover_token() -> str | None:
+    token_path = os.path.join(os.path.expanduser("~"), ".mover-token")
+    try:
+        with open(token_path) as f:
+            return f.read().strip()
+    except OSError:
+        return None
+
+
+def _mover_borders(enable: bool) -> None:
+    """Enable or disable tacky-borders via the mover API."""
+    endpoint = "/borders/enable" if enable else "/borders/disable"
+    token = _mover_token()
+    if token is None:
+        logger.warning("no mover token found, skipping borders toggle")
+        return
+    try:
+        req = urllib.request.Request(
+            f"{_MOVER_BASE}{endpoint}",
+            method="POST",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        with urllib.request.urlopen(req, timeout=5):
+            pass
+    except Exception as e:
+        logger.warning("mover borders %s failed (non-fatal): %s",
+                        "enable" if enable else "disable", e)
 
 
 # ------------------------------------------------------------------
@@ -420,19 +464,9 @@ def apply_desktop_preset(
 def _stop_glazewm() -> None:
     """Kill glazewm.exe and store its path for later restart."""
     global _glazewm_path
-    try:
-        result = subprocess.run(
-            ["wmic", "process", "where", "name='glazewm.exe'", "get", "ExecutablePath"],
-            capture_output=True, text=True, timeout=5,
-            creationflags=subprocess.CREATE_NO_WINDOW,
-        )
-        for line in result.stdout.splitlines():
-            line = line.strip()
-            if line and line.lower().endswith(".exe"):
-                _glazewm_path = line
-                break
-    except Exception:
-        logger.warning("failed to query glazewm.exe path")
+    _glazewm_path = shutil.which("glazewm")
+    if _glazewm_path is None:
+        logger.warning("glazewm not found on PATH")
 
     try:
         subprocess.run(
@@ -447,13 +481,14 @@ def _stop_glazewm() -> None:
 def _start_glazewm() -> None:
     """Restart GlazeWM from the previously captured path."""
     global _glazewm_path
-    if _glazewm_path is None:
-        logger.info("no glazewm path stored, skipping restart")
+    path = _glazewm_path or shutil.which("glazewm")
+    if path is None:
+        logger.warning("glazewm not found, skipping restart")
         return
     try:
         subprocess.Popen(
-            [_glazewm_path],
+            [path],
             creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
         )
     except Exception:
-        logger.warning("failed to start glazewm at %s", _glazewm_path)
+        logger.warning("failed to start glazewm at %s", path)
