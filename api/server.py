@@ -17,6 +17,7 @@ from .validate import (
     validate_app_request,
     validate_create_profile,
     validate_desktop_preset,
+    validate_fix_refresh,
     validate_gaming_preset,
     validate_set_resolution,
     validate_set_saturation,
@@ -403,12 +404,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(result)
 
     def _h_fix_refresh(self):
-        body = self._read_body()
-        skip = body.get("skip_devices", [])
-        if not isinstance(skip, list) or not all(isinstance(s, str) for s in skip):
-            self._send_error_response(422, "skip_devices must be an array of strings")
-            return
-        result = self._nvapi(service.fix_refresh_rates, skip or None)
+        body = validate_fix_refresh(self._read_body())
+        result = self._nvapi(service.fix_refresh_rates, body["skip_devices"] or None)
         if result is not None:
             self._send_json(result)
 

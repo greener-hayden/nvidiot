@@ -20,10 +20,10 @@ tasks:
       - "{{.PIP}} install -e .[dev]"
     status:
       - test -d {{.VENV_DIR}}
-      - "{{.PIP}} show fastapi"
+      - "{{.PIP}} show pytest"
 
   dev:
-    desc: Run the API server with auto-reload
+    desc: Run the API server
     deps: [venv]
     cmds:
       - "{{.PYTHON}} main.py"
@@ -32,7 +32,6 @@ tasks:
     desc: Build standalone .exe with PyInstaller
     deps: [venv]
     cmds:
-      - "{{.PIP}} install pyinstaller"
       - "{{.VENV_DIR}}/Scripts/pyinstaller --onefile --noconsole --name nvidiot main.py"
 
   stop:

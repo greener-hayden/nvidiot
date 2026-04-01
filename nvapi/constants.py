@@ -142,7 +142,6 @@ SETTING_IDS = {
 }
 
 
-
 # Known setting value enums
 # Note: VSyncMode values are driver-version-dependent small integers.
 # Query via the API to discover actual values for your driver version.

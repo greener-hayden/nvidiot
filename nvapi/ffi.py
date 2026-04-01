@@ -12,7 +12,6 @@ from ctypes import (
     c_uint32,
     c_wchar,
     c_wchar_p,
-    pointer,
     sizeof,
 )
 from typing import Any
@@ -534,7 +533,7 @@ def DRS_DeleteApplicationEx(
 # ------------------------------------------------------------------
 # Display functions
 # ------------------------------------------------------------------
-def EnumNvidiaDisplayHandle(index: int) -> NvDisplayHandle:
+def EnumNvidiaDisplayHandle(index: int) -> NvDisplayHandle | None:
     fn = _query(
         _id("NvAPI_EnumNvidiaDisplayHandle"),
         NvAPI_Status_t,

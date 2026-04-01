@@ -106,3 +106,7 @@ def validate_desktop_preset(data: dict) -> dict:
         "fix_refresh": _opt_bool(data, "fix_refresh"),
         "skip_devices": _opt_str_list(data, "skip_devices"),
     }
+
+
+def validate_fix_refresh(data: dict) -> dict:
+    return {"skip_devices": _opt_str_list(data, "skip_devices")}
