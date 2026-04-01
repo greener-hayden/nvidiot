@@ -265,6 +265,7 @@ def enable_monitor_device(pnp_id: str) -> None:
     result = subprocess.run(
         ["pnputil", "/enable-device", instance_id],
         capture_output=True, text=True, timeout=10,
+        creationflags=subprocess.CREATE_NO_WINDOW,
     )
     if result.returncode != 0:
         raise SetupAPIError(

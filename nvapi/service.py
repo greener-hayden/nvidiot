@@ -424,6 +424,7 @@ def _stop_glazewm() -> None:
         result = subprocess.run(
             ["wmic", "process", "where", "name='glazewm.exe'", "get", "ExecutablePath"],
             capture_output=True, text=True, timeout=5,
+            creationflags=subprocess.CREATE_NO_WINDOW,
         )
         for line in result.stdout.splitlines():
             line = line.strip()
@@ -437,6 +438,7 @@ def _stop_glazewm() -> None:
         subprocess.run(
             ["taskkill", "/IM", "glazewm.exe", "/F"],
             capture_output=True, timeout=5,
+            creationflags=subprocess.CREATE_NO_WINDOW,
         )
     except Exception:
         logger.warning("failed to kill glazewm.exe")
