@@ -276,10 +276,74 @@ class TestPresetDefaults:
         assert d["saturation"] == 90
         assert d["stretch"] is True
         assert d["refresh"] is None
+        assert d["disable_monitor"] is False
+        assert d["stop_glazewm"] is False
+        assert d["fix_refresh"] is False
+        assert d["skip_devices"] == []
+
+    def test_gaming_preset_with_monitor_and_glazewm(self):
+        d = validate_gaming_preset({
+            "width": 1920, "height": 1080,
+            "disable_monitor": True, "stop_glazewm": True,
+        })
+        assert d["disable_monitor"] is True
+        assert d["stop_glazewm"] is True
+
+    def test_gaming_preset_with_fix_refresh(self):
+        d = validate_gaming_preset({
+            "width": 1920, "height": 1080,
+            "fix_refresh": True, "skip_devices": ["\\\\.\\DISPLAY2"],
+        })
+        assert d["fix_refresh"] is True
+        assert d["skip_devices"] == ["\\\\.\\DISPLAY2"]
+
+    def test_gaming_preset_rejects_non_bool_disable_monitor(self):
+        with pytest.raises(ValidationError):
+            validate_gaming_preset({
+                "width": 1920, "height": 1080, "disable_monitor": 1,
+            })
+
+    def test_gaming_preset_rejects_non_bool_stop_glazewm(self):
+        with pytest.raises(ValidationError):
+            validate_gaming_preset({
+                "width": 1920, "height": 1080, "stop_glazewm": "yes",
+            })
+
+    def test_gaming_preset_rejects_bad_skip_devices(self):
+        with pytest.raises(ValidationError):
+            validate_gaming_preset({
+                "width": 1920, "height": 1080, "skip_devices": "not a list",
+            })
 
     def test_desktop_preset_defaults(self):
         d = validate_desktop_preset({})
         assert d["saturation"] == 50
+        assert d["enable_monitor"] is False
+        assert d["start_glazewm"] is False
+        assert d["fix_refresh"] is False
+        assert d["skip_devices"] == []
+
+    def test_desktop_preset_with_monitor_and_glazewm(self):
+        d = validate_desktop_preset({
+            "enable_monitor": True, "start_glazewm": True,
+        })
+        assert d["enable_monitor"] is True
+        assert d["start_glazewm"] is True
+
+    def test_desktop_preset_with_fix_refresh(self):
+        d = validate_desktop_preset({
+            "fix_refresh": True, "skip_devices": ["\\\\.\\DISPLAY1"],
+        })
+        assert d["fix_refresh"] is True
+        assert d["skip_devices"] == ["\\\\.\\DISPLAY1"]
+
+    def test_desktop_preset_rejects_non_bool_enable_monitor(self):
+        with pytest.raises(ValidationError):
+            validate_desktop_preset({"enable_monitor": "true"})
+
+    def test_desktop_preset_rejects_non_bool_start_glazewm(self):
+        with pytest.raises(ValidationError):
+            validate_desktop_preset({"start_glazewm": 0})
 
 
 class TestProfileAndAppValidation:

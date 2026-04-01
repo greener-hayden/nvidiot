@@ -10,6 +10,7 @@ from urllib.parse import unquote
 from nvapi import service
 from nvapi.constants import SETTING_IDS, NvAPI_Status
 from nvapi.ffi import NvAPIError
+from nvapi.setupapi import SetupAPIError
 
 from .validate import (
     ValidationError,
@@ -105,6 +106,7 @@ ROUTES: list[tuple[str, str, str, bool]] = [
     ("PUT",    "/display/resolution",                           "_h_set_resolution",      True),
     ("POST",  "/display/preset/gaming",                         "_h_gaming_preset",       True),
     ("POST",  "/display/preset/desktop",                        "_h_desktop_preset",      True),
+    ("POST",  "/display/fix-refresh",                           "_h_fix_refresh",         True),
     ("GET",    "/display",                                      "_h_get_display",         False),
     # Settings IDs
     ("GET",    "/settings/ids",                                 "_h_setting_ids",         False),
@@ -198,6 +200,10 @@ class Handler(BaseHTTPRequestHandler):
             logger.warning("NvAPIError in %s: %s", func.__name__, e)
             code = _STATUS_TO_HTTP.get(e.status, 500)
             self._send_error_response(code, "operation failed")
+            return None
+        except SetupAPIError as e:
+            logger.warning("SetupAPIError in %s: %s", func.__name__, e)
+            self._send_error_response(500, str(e))
             return None
 
     # --- Dispatch ---
@@ -366,13 +372,33 @@ class Handler(BaseHTTPRequestHandler):
 
     def _h_gaming_preset(self):
         body = validate_gaming_preset(self._read_body())
-        result = self._nvapi(service.apply_gaming_preset, body["width"], body["height"], body["saturation"], body["refresh"], body["stretch"])
+        result = self._nvapi(
+            service.apply_gaming_preset,
+            body["width"], body["height"], body["saturation"],
+            body["refresh"], body["stretch"],
+            body["disable_monitor"], body["stop_glazewm"],
+            body["fix_refresh"], body["skip_devices"],
+        )
         if result is not None:
             self._send_json(result)
 
     def _h_desktop_preset(self):
         body = validate_desktop_preset(self._read_body())
-        result = self._nvapi(service.apply_desktop_preset, body["saturation"])
+        result = self._nvapi(
+            service.apply_desktop_preset,
+            body["saturation"], body["enable_monitor"], body["start_glazewm"],
+            body["fix_refresh"], body["skip_devices"],
+        )
+        if result is not None:
+            self._send_json(result)
+
+    def _h_fix_refresh(self):
+        body = self._read_body()
+        skip = body.get("skip_devices", [])
+        if not isinstance(skip, list) or not all(isinstance(s, str) for s in skip):
+            self._send_error_response(422, "skip_devices must be an array of strings")
+            return
+        result = self._nvapi(service.fix_refresh_rates, skip or None)
         if result is not None:
             self._send_json(result)
 

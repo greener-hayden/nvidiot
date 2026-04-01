@@ -1,10 +1,17 @@
 """Pythonic wrappers around NVAPI FFI, returning plain dicts."""
 
+import logging
+import subprocess
 from contextlib import contextmanager
 from typing import Generator
 
 from . import ffi
 from .constants import NVDRS_DWORD_TYPE, NVDRS_WSTRING_TYPE, NvAPI_Status, SETTING_IDS, SETTING_VALUE_RANGES
+
+logger = logging.getLogger("nvidiot")
+
+# GlazeWM process path — captured before killing so we can restart it
+_glazewm_path: str | None = None
 
 
 @contextmanager
@@ -323,22 +330,128 @@ def set_resolution(
     return get_display_info()
 
 
+def fix_refresh_rates(skip_devices: list[str] | None = None) -> list[dict]:
+    """Set all active monitors to their max refresh rate for current resolution."""
+    _ensure_initialized()
+    skip = set(skip_devices or [])
+    adapters = ffi.EnumDisplayAdapters()
+    results = []
+    for adapter in adapters:
+        name = adapter["name"]
+        if not adapter["active"] or name in skip:
+            continue
+        try:
+            mode = ffi.GetCurrentDisplayModeForDevice(name)
+            max_hz = ffi.GetMaxRefreshForDevice(name, mode["width"], mode["height"])
+            changed = False
+            if max_hz > mode["refresh"]:
+                ffi.SetDeviceRefreshRate(name, max_hz)
+                changed = True
+            results.append({
+                "device": name,
+                "resolution": f"{mode['width']}x{mode['height']}",
+                "refresh_before": mode["refresh"],
+                "refresh_after": max_hz if changed else mode["refresh"],
+                "changed": changed,
+            })
+        except ffi.NvAPIError:
+            logger.warning("failed to fix refresh for %s", name)
+    return results
+
+
 def apply_gaming_preset(
     width: int,
     height: int,
     saturation: int = 90,
     refresh: int | None = None,
     stretch: bool = True,
+    disable_monitor: bool = False,
+    stop_glazewm: bool = False,
+    fix_refresh: bool = False,
+    skip_devices: list[str] | None = None,
 ) -> dict:
     _ensure_initialized()
+    if stop_glazewm:
+        _stop_glazewm()
+    if disable_monitor:
+        try:
+            from . import setupapi
+            pnp_id = setupapi.get_primary_monitor_pnpid()
+            setupapi.disable_monitor_device(pnp_id)
+        except Exception as e:
+            logger.warning("monitor disable failed (non-fatal): %s", e)
     set_resolution(width, height, refresh, stretch=stretch)
-    return set_saturation(saturation)
+    result = set_saturation(saturation)
+    if fix_refresh:
+        result["refresh_fixes"] = fix_refresh_rates(skip_devices)
+    return result
 
 
-def apply_desktop_preset(saturation: int = 50) -> dict:
+def apply_desktop_preset(
+    saturation: int = 50,
+    enable_monitor: bool = False,
+    start_glazewm: bool = False,
+    fix_refresh: bool = False,
+    skip_devices: list[str] | None = None,
+) -> dict:
     _ensure_initialized()
+    if enable_monitor:
+        try:
+            from . import setupapi
+            pnp_id = setupapi.get_primary_monitor_pnpid()
+            setupapi.enable_monitor_device(pnp_id)
+        except Exception as e:
+            logger.warning("monitor enable failed (non-fatal): %s", e)
     native = ffi.GetNativeDisplayMode()
     ffi.SetDisplayMode(
         native["width"], native["height"], native["refresh"], stretch=False
     )
-    return set_saturation(saturation)
+    result = set_saturation(saturation)
+    if fix_refresh:
+        result["refresh_fixes"] = fix_refresh_rates(skip_devices)
+    if start_glazewm:
+        _start_glazewm()
+    return result
+
+
+# ------------------------------------------------------------------
+# GlazeWM process management
+# ------------------------------------------------------------------
+def _stop_glazewm() -> None:
+    """Kill glazewm.exe and store its path for later restart."""
+    global _glazewm_path
+    try:
+        result = subprocess.run(
+            ["wmic", "process", "where", "name='glazewm.exe'", "get", "ExecutablePath"],
+            capture_output=True, text=True, timeout=5,
+        )
+        for line in result.stdout.splitlines():
+            line = line.strip()
+            if line and line.lower().endswith(".exe"):
+                _glazewm_path = line
+                break
+    except Exception:
+        logger.warning("failed to query glazewm.exe path")
+
+    try:
+        subprocess.run(
+            ["taskkill", "/IM", "glazewm.exe", "/F"],
+            capture_output=True, timeout=5,
+        )
+    except Exception:
+        logger.warning("failed to kill glazewm.exe")
+
+
+def _start_glazewm() -> None:
+    """Restart GlazeWM from the previously captured path."""
+    global _glazewm_path
+    if _glazewm_path is None:
+        logger.info("no glazewm path stored, skipping restart")
+        return
+    try:
+        subprocess.Popen(
+            [_glazewm_path],
+            creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
+        )
+    except Exception:
+        logger.warning("failed to start glazewm at %s", _glazewm_path)

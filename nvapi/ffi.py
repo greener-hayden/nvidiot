@@ -669,6 +669,82 @@ def SetDisplayMode(
 
 
 # ------------------------------------------------------------------
+# Multi-monitor display functions
+# ------------------------------------------------------------------
+_DISPLAY_DEVICE_ACTIVE = 0x00000001
+_DISPLAY_DEVICE_PRIMARY = 0x00000004
+
+
+class _DISPLAY_DEVICEW(Structure):
+    _fields_ = [
+        ("cb", wt.DWORD),
+        ("DeviceName", c_wchar * 32),
+        ("DeviceString", c_wchar * 128),
+        ("StateFlags", wt.DWORD),
+        ("DeviceID", c_wchar * 128),
+        ("DeviceKey", c_wchar * 128),
+    ]
+
+
+def EnumDisplayAdapters() -> list[dict]:
+    """Enumerate all display adapters, returning name/active/primary for each."""
+    adapters = []
+    dd = _DISPLAY_DEVICEW()
+    dd.cb = sizeof(_DISPLAY_DEVICEW)
+    idx = 0
+    while _user32.EnumDisplayDevicesW(None, idx, byref(dd), 0):
+        adapters.append({
+            "name": dd.DeviceName,
+            "active": bool(dd.StateFlags & _DISPLAY_DEVICE_ACTIVE),
+            "primary": bool(dd.StateFlags & _DISPLAY_DEVICE_PRIMARY),
+        })
+        dd = _DISPLAY_DEVICEW()
+        dd.cb = sizeof(_DISPLAY_DEVICEW)
+        idx += 1
+    return adapters
+
+
+def GetCurrentDisplayModeForDevice(device_name: str) -> dict:
+    """Get current resolution and refresh rate for a specific display adapter."""
+    dm = DEVMODEW()
+    dm.dmSize = sizeof(DEVMODEW)
+    if not _user32.EnumDisplaySettingsW(c_wchar_p(device_name), ENUM_CURRENT_SETTINGS, byref(dm)):
+        raise NvAPIError(-1, f"EnumDisplaySettingsW failed for {device_name}")
+    return {
+        "width": dm.dmPelsWidth,
+        "height": dm.dmPelsHeight,
+        "refresh": dm.dmDisplayFrequency,
+    }
+
+
+def GetMaxRefreshForDevice(device_name: str, width: int, height: int) -> int:
+    """Find the max refresh rate available for a given resolution on a specific device."""
+    best_hz = 0
+    dm = DEVMODEW()
+    dm.dmSize = sizeof(DEVMODEW)
+    i = 0
+    while _user32.EnumDisplaySettingsW(c_wchar_p(device_name), i, byref(dm)):
+        if dm.dmPelsWidth == width and dm.dmPelsHeight == height:
+            if dm.dmDisplayFrequency > best_hz:
+                best_hz = dm.dmDisplayFrequency
+        i += 1
+    return best_hz
+
+
+def SetDeviceRefreshRate(device_name: str, refresh: int) -> None:
+    """Set only the refresh rate for a specific display adapter (no resolution change)."""
+    dm = DEVMODEW()
+    dm.dmSize = sizeof(DEVMODEW)
+    dm.dmDisplayFrequency = refresh
+    dm.dmFields = DM_DISPLAYFREQUENCY
+    result = _user32.ChangeDisplaySettingsExW(
+        c_wchar_p(device_name), byref(dm), None, CDS_UPDATEREGISTRY, None
+    )
+    if result != DISP_CHANGE_SUCCESSFUL:
+        raise NvAPIError(result, f"ChangeDisplaySettings({device_name}@{refresh})")
+
+
+# ------------------------------------------------------------------
 # Error handling
 # ------------------------------------------------------------------
 class NvAPIError(Exception):
