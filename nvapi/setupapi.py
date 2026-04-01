@@ -19,7 +19,7 @@ from ctypes import (
 # ------------------------------------------------------------------
 # DLL loads
 # ------------------------------------------------------------------
-_setupapi = WinDLL("setupapi")
+_setupapi = WinDLL("setupapi", use_last_error=True)
 _user32 = WinDLL("user32")
 
 
@@ -239,7 +239,7 @@ def disable_monitor_device(pnp_id: str) -> None:
         if not _SetupDiCallClassInstaller(
             DIF_PROPERTYCHANGE, dev_info, byref(dev_data),
         ):
-            err = ctypes.get_last_error() or ctypes.GetLastError()
+            err = ctypes.get_last_error()
             raise SetupAPIError(
                 f"SetupDiCallClassInstaller failed to disable monitor "
                 f"(error {err}, requires admin privileges)"

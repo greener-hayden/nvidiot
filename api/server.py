@@ -374,10 +374,16 @@ class Handler(BaseHTTPRequestHandler):
         body = validate_gaming_preset(self._read_body())
         result = self._nvapi(
             service.apply_gaming_preset,
-            body["width"], body["height"], body["saturation"],
-            body["refresh"], body["stretch"],
-            body["disable_monitor"], body["stop_glazewm"],
-            body["fix_refresh"], body["skip_devices"],
+            width=body["width"],
+            height=body["height"],
+            saturation=body["saturation"],
+            refresh=body["refresh"],
+            stretch=body["stretch"],
+            disable_monitor=body["disable_monitor"],
+            stop_glazewm=body["stop_glazewm"],
+            disable_borders=body["disable_borders"],
+            fix_refresh=body["fix_refresh"],
+            skip_devices=body["skip_devices"],
         )
         if result is not None:
             self._send_json(result)
@@ -386,8 +392,12 @@ class Handler(BaseHTTPRequestHandler):
         body = validate_desktop_preset(self._read_body())
         result = self._nvapi(
             service.apply_desktop_preset,
-            body["saturation"], body["enable_monitor"], body["start_glazewm"],
-            body["fix_refresh"], body["skip_devices"],
+            saturation=body["saturation"],
+            enable_monitor=body["enable_monitor"],
+            start_glazewm=body["start_glazewm"],
+            enable_borders=body["enable_borders"],
+            fix_refresh=body["fix_refresh"],
+            skip_devices=body["skip_devices"],
         )
         if result is not None:
             self._send_json(result)

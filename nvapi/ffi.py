@@ -580,7 +580,8 @@ def GetCurrentDisplayMode() -> dict:
     """Get current display resolution and refresh rate via Win32."""
     dm = DEVMODEW()
     dm.dmSize = sizeof(DEVMODEW)
-    _user32.EnumDisplaySettingsW(None, ENUM_CURRENT_SETTINGS, byref(dm))
+    if not _user32.EnumDisplaySettingsW(None, ENUM_CURRENT_SETTINGS, byref(dm)):
+        raise NvAPIError(-1, "EnumDisplaySettingsW failed for primary display")
     return {
         "width": dm.dmPelsWidth,
         "height": dm.dmPelsHeight,
@@ -665,7 +666,7 @@ def SetDisplayMode(
         dm.dmFields |= DM_DISPLAYFIXEDOUTPUT
     result = _user32.ChangeDisplaySettingsExW(None, byref(dm), None, CDS_UPDATEREGISTRY, None)
     if result != DISP_CHANGE_SUCCESSFUL:
-        raise NvAPIError(result, f"ChangeDisplaySettings({width}x{height}@{refresh})")
+        raise DisplayModeError(result, f"ChangeDisplaySettings({width}x{height}@{refresh})")
 
 
 # ------------------------------------------------------------------
@@ -741,7 +742,7 @@ def SetDeviceRefreshRate(device_name: str, refresh: int) -> None:
         c_wchar_p(device_name), byref(dm), None, CDS_UPDATEREGISTRY, None
     )
     if result != DISP_CHANGE_SUCCESSFUL:
-        raise NvAPIError(result, f"ChangeDisplaySettings({device_name}@{refresh})")
+        raise DisplayModeError(result, f"ChangeDisplaySettings({device_name}@{refresh})")
 
 
 # ------------------------------------------------------------------
@@ -756,6 +757,17 @@ class NvAPIError(Exception):
         except Exception:
             msg = f"status {status}"
         super().__init__(f"{func_name} failed: {msg} ({status})")
+
+
+class DisplayModeError(NvAPIError):
+    """Win32 ChangeDisplaySettings error (DISP_CHANGE_* codes)."""
+    _DISP_CODES = {-1: "FAILED", -2: "BADMODE", -3: "NOTUPDATED", -4: "BADFLAGS", -5: "BADPARAM", -6: "RESTART"}
+
+    def __init__(self, result: int, context: str):
+        self.status = result
+        self.func_name = context
+        msg = self._DISP_CODES.get(result, f"DISP_CHANGE code {result}")
+        Exception.__init__(self, f"{context} failed: {msg} ({result})")
 
 
 def _check(status: int, func_name: str) -> None:
