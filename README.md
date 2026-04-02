@@ -9,7 +9,7 @@
 
 ---
 
-nvidiot wraps the NVIDIA Control Panel driver settings through [NVAPI](https://developer.nvidia.com/rtx/nvapi) (`nvapi64.dll`) using ctypes FFI.
+nvidiot wraps the NVIDIA Control Panel driver settings through [NVAPI](https://developer.nvidia.com/nvapi) (`nvapi64.dll`) using ctypes FFI.
 It exposes GPU info, driver profiles, DRS settings, and display configuration as a local REST API — useful for automation scripts, status bar widgets, and gaming presets.
 
 Runs on `127.0.0.1:8000` only. Not reachable from the network.
