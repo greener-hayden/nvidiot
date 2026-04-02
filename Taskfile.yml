@@ -66,3 +66,22 @@ tasks:
       - task: stop
       - 'schtasks /Delete /TN "{{.TASK_NAME}}" /F 2>NUL || true'
       - echo "Scheduled task '{{.TASK_NAME}}' removed"
+
+  release:
+    desc: "Bump version, tag, and push to trigger a GitHub release (usage: task release -- 0.2.0)"
+    cmds:
+      - |
+        VERSION="{{.CLI_ARGS}}"
+        if [ -z "$VERSION" ]; then
+          echo "Usage: task release -- <version>  (e.g. task release -- 0.2.0)"
+          exit 1
+        fi
+        if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+          echo "Error: version must be in X.Y.Z format (got: $VERSION)"
+          exit 1
+        fi
+        sed -i "s/^version = \".*\"/version = \"$VERSION\"/" pyproject.toml
+        git add pyproject.toml
+        git commit -m "Bump version to $VERSION"
+        git tag "v$VERSION"
+        git push origin main "v$VERSION"
