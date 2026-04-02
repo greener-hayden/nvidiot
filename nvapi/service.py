@@ -1,11 +1,11 @@
 """Pythonic wrappers around NVAPI FFI, returning plain dicts."""
 
 import logging
-import os
 import shutil
 import subprocess
 import urllib.request
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Generator
 
 from . import ffi
@@ -162,6 +162,7 @@ def get_base_setting(setting_id: int) -> dict:
 
 
 def _validate_setting_write(setting_id: int, value: int) -> None:
+    # NvAPIError reused here so server.py maps these to 400 via _STATUS_TO_HTTP.
     if setting_id not in SETTING_IDS:
         raise ffi.NvAPIError(
             NvAPI_Status.NVAPI_INVALID_ARGUMENT,
@@ -430,10 +431,9 @@ _MOVER_BASE = "http://127.0.0.1:42123"
 
 
 def _mover_token() -> str | None:
-    token_path = os.path.join(os.path.expanduser("~"), ".mover-token")
+    token_path = Path.home() / ".mover-token"
     try:
-        with open(token_path) as f:
-            return f.read().strip()
+        return token_path.read_text().strip()
     except OSError:
         return None
 

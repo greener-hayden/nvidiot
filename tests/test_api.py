@@ -5,8 +5,9 @@ import json
 import threading
 
 import pytest
+import secrets
 
-from main import TOKEN
+TOKEN = secrets.token_urlsafe(32)
 
 # ---------------------------------------------------------------------------
 # Server fixture — start once per session in a background thread
@@ -17,7 +18,8 @@ _server = None
 @pytest.fixture(scope="session", autouse=True)
 def api_server():
     global _server
-    from api.server import NvidiotServer, Handler
+    from api.server import NvidiotServer, Handler, init_token
+    init_token(TOKEN)
 
     _server = NvidiotServer(("127.0.0.1", 18000), Handler)
     t = threading.Thread(target=_server.serve_until_stopped, daemon=True)
@@ -129,7 +131,7 @@ def test_round_trip_setting():
 
 
 def test_write_without_auth_returns_401():
-    """Write endpoints require Bearer token."""
+    """Write endpoints reject unauthenticated requests when auth is enabled."""
     status, _ = _request("POST", "/profiles", {"name": "should_fail"})
     assert status == 401
 

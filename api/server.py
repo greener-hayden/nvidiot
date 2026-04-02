@@ -1,4 +1,4 @@
-"""Stdlib HTTP server — replaces FastAPI + uvicorn."""
+"""Stdlib HTTP server for the nvidiot API."""
 
 import json
 import logging
@@ -27,7 +27,7 @@ from .validate import (
 logger = logging.getLogger("nvidiot")
 
 # --- Auth state ---
-_TOKEN: str = ""
+_TOKEN: str | None = None
 
 
 def init_token(token: str) -> None:
@@ -175,6 +175,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Access-Control-Allow-Credentials", "true")
 
     def _check_auth(self) -> bool:
+        if _TOKEN is None:
+            return True
         auth = self.headers.get("Authorization", "")
         if not auth.startswith("Bearer ") or not secrets.compare_digest(
             auth[7:], _TOKEN

@@ -54,14 +54,11 @@ def validate_set_saturation(data: dict) -> dict:
 
 
 def validate_set_resolution(data: dict) -> dict:
-    stretch = data.get("stretch", True)
-    if not isinstance(stretch, bool):
-        raise ValidationError("stretch must be a boolean")
     return {
         "width": _int_range(data, "width", 640, 15360),
         "height": _int_range(data, "height", 480, 8640),
         "refresh": _int_range(data, "refresh", 24, 600, default=None),
-        "stretch": stretch,
+        "stretch": _opt_bool(data, "stretch", default=True),
     }
 
 
@@ -80,15 +77,12 @@ def _opt_str_list(data: dict, key: str) -> list[str]:
 
 
 def validate_gaming_preset(data: dict) -> dict:
-    stretch = data.get("stretch", True)
-    if not isinstance(stretch, bool):
-        raise ValidationError("stretch must be a boolean")
     return {
         "width": _int_range(data, "width", 640, 15360),
         "height": _int_range(data, "height", 480, 8640),
         "saturation": _int_range(data, "saturation", 0, 100, default=90),
         "refresh": _int_range(data, "refresh", 24, 600, default=None),
-        "stretch": stretch,
+        "stretch": _opt_bool(data, "stretch", default=True),
         "disable_monitor": _opt_bool(data, "disable_monitor"),
         "stop_glazewm": _opt_bool(data, "stop_glazewm"),
         "disable_borders": _opt_bool(data, "disable_borders"),

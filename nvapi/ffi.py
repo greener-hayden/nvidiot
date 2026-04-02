@@ -1,4 +1,4 @@
-"""Raw ctypes bindings to nvapi64.dll via QueryInterface."""
+"""Raw ctypes bindings — NVAPI (nvapi64.dll) and Win32 display functions."""
 
 import ctypes
 import ctypes.wintypes as wt
@@ -48,6 +48,36 @@ def _query(fn_id: int, restype: Any, argtypes: list[Any]) -> Any:
     fn = proto(ptr)
     _cache[fn_id] = fn
     return fn
+
+
+# ------------------------------------------------------------------
+# Error handling (defined early — used by every wrapper below)
+# ------------------------------------------------------------------
+class NvAPIError(Exception):
+    def __init__(self, status: int, func_name: str):
+        self.status = status
+        self.func_name = func_name
+        try:
+            msg = GetErrorMessage(status)
+        except Exception:
+            msg = f"status {status}"
+        super().__init__(f"{func_name} failed: {msg} ({status})")
+
+
+class DisplayModeError(NvAPIError):
+    """Win32 ChangeDisplaySettings error (DISP_CHANGE_* codes)."""
+    _DISP_CODES = {-1: "FAILED", -2: "BADMODE", -3: "NOTUPDATED", -4: "BADFLAGS", -5: "BADPARAM", -6: "RESTART"}
+
+    def __init__(self, result: int, context: str):
+        self.status = result
+        self.func_name = context
+        msg = self._DISP_CODES.get(result, f"DISP_CHANGE code {result}")
+        Exception.__init__(self, f"{context} failed: {msg} ({result})")
+
+
+def _check(status: int, func_name: str) -> None:
+    if status != NvAPI_Status.NVAPI_OK:
+        raise NvAPIError(status, func_name)
 
 
 # ------------------------------------------------------------------
@@ -159,7 +189,6 @@ class NV_DVC_INFO_V1(Structure):
 NV_DVC_INFO_VER1 = sizeof(NV_DVC_INFO_V1) | (1 << 16)
 NV_DVC_INFO = NV_DVC_INFO_V1
 NV_DVC_INFO_VER = NV_DVC_INFO_VER1
-
 
 
 # ------------------------------------------------------------------
@@ -580,7 +609,7 @@ def GetCurrentDisplayMode() -> dict:
     dm = DEVMODEW()
     dm.dmSize = sizeof(DEVMODEW)
     if not _user32.EnumDisplaySettingsW(None, ENUM_CURRENT_SETTINGS, byref(dm)):
-        raise NvAPIError(-1, "EnumDisplaySettingsW failed for primary display")
+        raise DisplayModeError(-1, "EnumDisplaySettingsW failed for primary display")
     return {
         "width": dm.dmPelsWidth,
         "height": dm.dmPelsHeight,
@@ -709,7 +738,7 @@ def GetCurrentDisplayModeForDevice(device_name: str) -> dict:
     dm = DEVMODEW()
     dm.dmSize = sizeof(DEVMODEW)
     if not _user32.EnumDisplaySettingsW(c_wchar_p(device_name), ENUM_CURRENT_SETTINGS, byref(dm)):
-        raise NvAPIError(-1, f"EnumDisplaySettingsW failed for {device_name}")
+        raise DisplayModeError(-1, f"EnumDisplaySettingsW failed for {device_name}")
     return {
         "width": dm.dmPelsWidth,
         "height": dm.dmPelsHeight,
@@ -742,33 +771,3 @@ def SetDeviceRefreshRate(device_name: str, refresh: int) -> None:
     )
     if result != DISP_CHANGE_SUCCESSFUL:
         raise DisplayModeError(result, f"ChangeDisplaySettings({device_name}@{refresh})")
-
-
-# ------------------------------------------------------------------
-# Error handling
-# ------------------------------------------------------------------
-class NvAPIError(Exception):
-    def __init__(self, status: int, func_name: str):
-        self.status = status
-        self.func_name = func_name
-        try:
-            msg = GetErrorMessage(status)
-        except Exception:
-            msg = f"status {status}"
-        super().__init__(f"{func_name} failed: {msg} ({status})")
-
-
-class DisplayModeError(NvAPIError):
-    """Win32 ChangeDisplaySettings error (DISP_CHANGE_* codes)."""
-    _DISP_CODES = {-1: "FAILED", -2: "BADMODE", -3: "NOTUPDATED", -4: "BADFLAGS", -5: "BADPARAM", -6: "RESTART"}
-
-    def __init__(self, result: int, context: str):
-        self.status = result
-        self.func_name = context
-        msg = self._DISP_CODES.get(result, f"DISP_CHANGE code {result}")
-        Exception.__init__(self, f"{context} failed: {msg} ({result})")
-
-
-def _check(status: int, func_name: str) -> None:
-    if status != NvAPI_Status.NVAPI_OK:
-        raise NvAPIError(status, func_name)

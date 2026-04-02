@@ -4,11 +4,6 @@ vars:
   VENV_DIR: .venv
   PYTHON: "{{.VENV_DIR}}/Scripts/python"
   PIP: "{{.VENV_DIR}}/Scripts/pip"
-  INSTALL_DIR:
-    sh: echo "${LOCALAPPDATA}/nvidiot"
-  BIN_DIR:
-    sh: echo "${USERPROFILE}/.local/bin"
-  TASK_NAME: nvidiot
 
 tasks:
   venv:
@@ -34,41 +29,19 @@ tasks:
     cmds:
       - "{{.VENV_DIR}}/Scripts/pyinstaller --onefile --noconsole --name nvidiot main.py"
 
-  stop:
-    desc: Stop running nvidiot instance
-    ignore_error: true
-    cmds:
-      - 'powershell -NoProfile -Command "if (Test-Path \"$env:USERPROFILE\.nvidiot-token\") { $t = Get-Content \"$env:USERPROFILE\.nvidiot-token\"; curl.exe -s -o NUL -X POST -H \"Authorization: Bearer $t\" http://127.0.0.1:8000/shutdown } else { curl.exe -s -o NUL -X POST http://127.0.0.1:8000/shutdown }"'
-      - 'taskkill /F /IM nvidiot.exe 2>NUL || true'
-      - 'powershell -NoProfile -Command "Start-Sleep -Seconds 2"'
-
   install:
     desc: Build, install, and register as a scheduled task (requires admin)
     deps: [build]
     cmds:
-      - task: stop
-      - mkdir -p "{{.INSTALL_DIR}}"
-      - cp dist/nvidiot.exe "{{.INSTALL_DIR}}/nvidiot.exe"
-      - mkdir -p "{{.BIN_DIR}}"
-      - cp nvidiot.cmd "{{.BIN_DIR}}/nvidiot.cmd"
-      - task: register
-      - echo "Installed nvidiot to {{.INSTALL_DIR}}/nvidiot.exe"
-      - echo "Scheduled task '{{.TASK_NAME}}' registered (runs at logon with admin privileges)"
-
-  register:
-    desc: Create/update the scheduled task to run nvidiot at logon with admin privileges
-    cmds:
-      - 'powershell -NoProfile -Command "Start-Process powershell -Verb RunAs -Wait -ArgumentList ''-NoProfile'', ''-Command'', ''schtasks /Delete /TN \"{{.TASK_NAME}}\" /F 2>$null; schtasks /Create /TN \"{{.TASK_NAME}}\" /TR \"\\\"{{.INSTALL_DIR}}/nvidiot.exe\\\"\" /SC ONLOGON /RL HIGHEST /F; schtasks /Run /TN \"{{.TASK_NAME}}\"''"'
+      - dist/nvidiot.exe install
 
   uninstall:
     desc: Stop nvidiot and remove the scheduled task
     cmds:
-      - task: stop
-      - 'schtasks /Delete /TN "{{.TASK_NAME}}" /F 2>NUL || true'
-      - echo "Scheduled task '{{.TASK_NAME}}' removed"
+      - dist/nvidiot.exe uninstall
 
   release:
-    desc: "Bump version, tag, and push to trigger a GitHub release (usage: task release -- 0.2.0)"
+    desc: "Bump version and push (workflow creates tag + release) — usage: task release -- 0.2.0"
     cmds:
       - |
         VERSION="{{.CLI_ARGS}}"
@@ -84,5 +57,4 @@ tasks:
           "(Get-Content pyproject.toml -Raw) -replace 'version = \".*?\"', 'version = \"$VERSION\"' | Set-Content -NoNewline pyproject.toml"
         git add pyproject.toml
         git commit -m "Bump version to $VERSION"
-        git tag "v$VERSION"
-        git push origin main "v$VERSION"
+        git push origin main

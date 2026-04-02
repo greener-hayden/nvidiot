@@ -7,6 +7,7 @@ consistency using mocks instead of real GPU calls.
 import ctypes
 import http.client
 import json
+import secrets
 import threading
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -413,11 +414,11 @@ class TestAPIErrorMapping:
     def _setup_server(self):
         """Start a test server with DLL mocked."""
         import api.server as srv_mod
-        srv_mod._last_write = 0.0  # reset write cooldown
+        srv_mod._last_write = 0.0  # bypass write throttle for test isolation
 
         with patch("ctypes.WinDLL", side_effect=_mock_windll):
             from api.server import NvidiotServer, Handler, init_token
-            from main import TOKEN
+            TOKEN = secrets.token_urlsafe(32)
             init_token(TOKEN)
 
         self.server = NvidiotServer(("127.0.0.1", 18001), Handler)
