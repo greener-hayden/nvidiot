@@ -76,11 +76,12 @@ tasks:
           echo "Usage: task release -- <version>  (e.g. task release -- 0.2.0)"
           exit 1
         fi
-        if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-          echo "Error: version must be in X.Y.Z format (got: $VERSION)"
-          exit 1
-        fi
-        sed -i "s/^version = \".*\"/version = \"$VERSION\"/" pyproject.toml
+        case "$VERSION" in
+          [0-9]*.[0-9]*.[0-9]*) ;;
+          *) echo "Error: version must be in X.Y.Z format (got: $VERSION)"; exit 1 ;;
+        esac
+        powershell -NoProfile -Command \
+          "(Get-Content pyproject.toml -Raw) -replace 'version = \".*?\"', 'version = \"$VERSION\"' | Set-Content -NoNewline pyproject.toml"
         git add pyproject.toml
         git commit -m "Bump version to $VERSION"
         git tag "v$VERSION"
