@@ -53,12 +53,10 @@ class NvAPI_Status(IntEnum):
 # NvAPI QueryInterface function IDs
 NVAPI_FUNC_IDS = {
     "NvAPI_Initialize": 0x0150E828,
-    "NvAPI_Unload": 0xD22BDD7E,
     "NvAPI_GetErrorMessage": 0x6C2D048C,
     "NvAPI_EnumPhysicalGPUs": 0xE5AC921F,
     "NvAPI_GPU_GetFullName": 0xCEEE8E9F,
     "NvAPI_GPU_GetThermalSettings": 0xE3640A56,
-    "NvAPI_GPU_GetAllClockFrequencies": 0xDCB616C3,
     "NvAPI_DRS_CreateSession": 0x0694D52E,
     "NvAPI_DRS_DestroySession": 0xDAD9CFF8,
     "NvAPI_DRS_LoadSettings": 0x375DBD6B,

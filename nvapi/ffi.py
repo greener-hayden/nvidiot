@@ -256,11 +256,6 @@ def Initialize() -> int:
     return fn()
 
 
-def Unload() -> int:
-    fn = _query(_id("NvAPI_Unload"), NvAPI_Status_t, [])
-    return fn()
-
-
 def GetErrorMessage(status: int) -> str:
     fn = _query(
         _id("NvAPI_GetErrorMessage"),
