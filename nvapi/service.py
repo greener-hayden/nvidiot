@@ -364,8 +364,8 @@ def fix_refresh_rates(skip_devices: list[str] | None = None) -> list[dict]:
 
 
 def apply_gaming_preset(
-    width: int,
-    height: int,
+    width: int | None = None,
+    height: int | None = None,
     saturation: int = 90,
     refresh: int | None = None,
     stretch: bool = True,
@@ -387,7 +387,8 @@ def apply_gaming_preset(
             setupapi.disable_monitor_device(pnp_id)
         except Exception as e:
             logger.warning("monitor disable failed (non-fatal): %s", e)
-    set_resolution(width, height, refresh, stretch=stretch)
+    if width is not None and height is not None:
+        set_resolution(width, height, refresh, stretch=stretch)
     result = set_saturation(saturation)
     if fix_refresh:
         result["refresh_fixes"] = fix_refresh_rates(skip_devices)

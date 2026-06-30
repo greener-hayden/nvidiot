@@ -78,8 +78,8 @@ def _opt_str_list(data: dict, key: str) -> list[str]:
 
 def validate_gaming_preset(data: dict) -> dict:
     return {
-        "width": _int_range(data, "width", 640, 15360),
-        "height": _int_range(data, "height", 480, 8640),
+        "width": _int_range(data, "width", 640, 15360, default=None),
+        "height": _int_range(data, "height", 480, 8640, default=None),
         "saturation": _int_range(data, "saturation", 0, 100, default=90),
         "refresh": _int_range(data, "refresh", 24, 600, default=None),
         "stretch": _opt_bool(data, "stretch", default=True),
