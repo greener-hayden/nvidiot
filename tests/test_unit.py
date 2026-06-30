@@ -274,6 +274,17 @@ class TestSetResolutionValidation:
 class TestPresetDefaults:
     def test_gaming_preset_defaults(self):
         d = validate_gaming_preset({"width": 1920, "height": 1080})
+
+    def test_gaming_preset_no_resolution(self):
+        """Gaming preset body may omit width/height (no res change)."""
+        d = validate_gaming_preset({
+            "disable_monitor": True, "stop_glazewm": True,
+        })
+        assert d["width"] is None
+        assert d["height"] is None
+        assert d["saturation"] == 90
+        assert d["disable_monitor"] is True
+        assert d["stop_glazewm"] is True
         assert d["saturation"] == 90
         assert d["stretch"] is True
         assert d["refresh"] is None
